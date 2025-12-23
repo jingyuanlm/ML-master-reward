@@ -350,9 +350,13 @@ class MCTSAgent:
         from .reward_inference import RewardModelInference
         from transformers import AutoTokenizer
         import os
-        logdir = DS_RD_SETTING.reward_model_path
-        base_model = DS_RD_SETTING.reward_base_model
-        comp_dict_path = DS_RD_SETTING.competition_mapping_path
+        reward_model_path = "/data/Blob_EastUS/FinetuneAgenticLLM/reward_ckpt/last_run_5"
+        reward_base_model = "Qwen/Qwen3-0.6B"
+        competition_mapping_path = "/data/Blob_EastUS/FinetuneAgenticLLM/reward_ckpt/comp_to_scen.json"
+
+        logdir = reward_model_path
+        base_model = reward_base_model
+        comp_dict_path = competition_mapping_path
 
         adapter_path = os.path.join(logdir, "lora_adapter")
         reward_head_path = os.path.join(logdir, "reward_head.pt")
@@ -381,11 +385,9 @@ class MCTSAgent:
         with open(comp_dict_path, "r") as f:
             comp_dict = json.load(f)
 
-        #competition = trace.scen.competition ??
-        comp_description = comp_dict[competition]
-
+        exp_id = self.cfg.exp_name.split("_")[0]
+        comp_description = comp_dict[exp_id]
         texts_for_reward = [c["hypothesis_chain"] for c in candidates]
-
         rewards = model.compute_reward(
             texts_for_reward,
             tokenizer,
@@ -406,10 +408,8 @@ class MCTSAgent:
                 model=self.acfg.code.model,
                 cfg=self.cfg,
             )
-
             code = extract_code(completion_text)
             nl_text = extract_text_up_to_code(completion_text)
-
             if code and nl_text:
                 candidates.append({
                     "nl_text": nl_text,
@@ -450,7 +450,6 @@ class MCTSAgent:
             if not candidates:
                 return "", completion_text
             best = self.reward_model_select_hypothesis(parent_node, candidates)
-
             return best["nl_text"], best["code"]
 
 

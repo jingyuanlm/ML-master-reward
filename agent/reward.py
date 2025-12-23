@@ -84,7 +84,7 @@ class RewardModelInference(nn.Module):
             inputs,
             truncation=True,
             padding=True,
-            max_length=DS_RD_SETTING.max_length,
+            max_length=2300,
             return_tensors="pt"
         )
 
