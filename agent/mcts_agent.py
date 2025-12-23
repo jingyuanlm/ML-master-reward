@@ -17,7 +17,7 @@ from utils.response import extract_code, extract_text_up_to_code, wrap_code, ext
 from utils.server_utils import call_validate
 from utils.mcts import linear_decay, exponential_decay, piecewise_decay, dynamic_piecewise_decay
 import threading
-
+import json
 logger = logging.getLogger("ml-master")
 
 
@@ -214,7 +214,7 @@ class MCTSAgent:
             prompt_complete = f"<｜begin▁of▁sentence｜>\n{introduction}\n<｜User｜>{user_prompt}<｜Assistant｜><think>\nOkay! Now, I will focus my efforts on successfully completing this current task.\nBefore completing this task, first of all, I need to analyze and understand the relevant dataset. The information of the dataset is as follows: \n{self.data_preview}"
         
         self.virtual_root.add_expected_child_count()
-        plan, code = self.plan_and_code_query(prompt_complete)
+        plan, code = self.plan_and_code_query(prompt_complete,None)
         new_node = MCTSNode(plan=plan, code=code, parent=self.virtual_root, stage="draft", local_best_node=self.virtual_root)
         logger.info(f"Drafted a new node {new_node.id} successfully!")
         return new_node
@@ -271,7 +271,7 @@ class MCTSAgent:
 
         parent_node.add_expected_child_count()
 
-        plan, code = self.plan_and_code_query(prompt_complete)
+        plan, code = self.plan_and_code_query(prompt_complete,parent_node)
         new_node = MCTSNode(plan=plan, code=code, parent=parent_node, stage="improve", local_best_node=parent_node.local_best_node)
         logger.info(f"Improving node {parent_node.id} to create new node {new_node.id}")
         return new_node
@@ -328,33 +328,133 @@ class MCTSAgent:
             user_prompt = f"\n# Task description\n{prompt['Task description']}\n{instructions}"
             prompt_complete = f"<｜begin▁of▁sentence｜>{prompt['Introduction']}<｜User｜>{user_prompt}<｜Assistant｜><think>\nOkay! Now, I will focus my efforts on successfully completing this current task.\nBefore completing this task, first of all, I need to analyze and understand the relevant dataset. The information of the dataset is as follows: \n{self.data_preview}\nRegarding this task, I previously made an attempt with the following code:\n{prompt['Previous (buggy) implementation']}\nHowever, there are the following issues with this code:\n{prompt['Execution output']}\nI hold the view that the underlying reasons giving rise to the emergence of this issue are:\n{parent_node.analysis}\nThe previous solution had a bug and/or did not produce a submission.csv, or the generated submission.csv was in an incorrect format.I will try to fix the bug."
         parent_node.add_expected_child_count()
-        plan, code = self.plan_and_code_query(prompt_complete)
+        plan, code = self.plan_and_code_query(prompt_complete,None)
         new_node = MCTSNode(plan=plan, code=code, parent=parent_node, stage="debug", local_best_node=parent_node.local_best_node)
         logger.info(f"Debugging node {parent_node.id} to create new node {new_node.id}")
         return new_node
+
+    def get_parent_chain(self, node: MCTSNode, include_self: bool = True):
+        chain = []
+        cur = node if include_self else node.parent
+
+        while cur is not None:
+            chain.append(cur)
+            cur = cur.parent
+
+        return list(reversed(chain))
+
+    def reward_model_select_hypothesis(self,current_node, candidates: dict ):
+        """
+        Select hypothesis based on reward model scores.
+        """
+        from .reward_inference import RewardModelInference
+        from transformers import AutoTokenizer
+        import os
+        logdir = DS_RD_SETTING.reward_model_path
+        base_model = DS_RD_SETTING.reward_base_model
+        comp_dict_path = DS_RD_SETTING.competition_mapping_path
+
+        adapter_path = os.path.join(logdir, "lora_adapter")
+        reward_head_path = os.path.join(logdir, "reward_head.pt")
+        calib_path = os.path.join(logdir, "calib.json")
+
+        tokenizer = AutoTokenizer.from_pretrained(base_model)
+        if not getattr(tokenizer, "pad_token", None):
+            tokenizer.pad_token = tokenizer.eos_token
+
+        model = RewardModelInference(
+            base_model_name=base_model,
+            adapter_path=adapter_path,
+            reward_head_path=reward_head_path,
+        ).to("cuda")
+        model.eval()
+
+        chain = self.get_parent_chain(current_node)
+
+        for c in candidates:
+            plans = [
+                node.plan for node in chain if node.plan is not None
+            ]
+            plans.append(c["nl_text"])   # or c["plan"]
+            c["hypothesis_chain"] = " -> ".join(plans)
     
-    def plan_and_code_query(self, prompt, retries=3) -> tuple[str, str]:
-        """Generate a natural language plan + code in the same LLM call and split them apart."""
-        completion_text = None
+        with open(comp_dict_path, "r") as f:
+            comp_dict = json.load(f)
+
+        #competition = trace.scen.competition ??
+        comp_description = comp_dict[competition]
+
+        texts_for_reward = [c["hypothesis_chain"] for c in candidates]
+
+        rewards = model.compute_reward(
+            texts_for_reward,
+            tokenizer,
+            comp_description
+        )
+
+        max_idx = rewards.index(max(rewards))
+        return  candidates[max_idx]
+
+
+    def generate_candidates(self, prompt, k=3, retries=10):
+        candidates = []
+
         for _ in range(retries):
             completion_text = r1_query(
-                prompt = prompt,
+                prompt=prompt,
                 temperature=self.acfg.code.temp,
                 model=self.acfg.code.model,
-                cfg=self.cfg
+                cfg=self.cfg,
             )
 
             code = extract_code(completion_text)
             nl_text = extract_text_up_to_code(completion_text)
 
             if code and nl_text:
-                # merge all code blocks into a single string
-                return nl_text, code
+                candidates.append({
+                    "nl_text": nl_text,
+                    "code": code,
+                    "raw_completion": completion_text,
+                })
 
-            logger.info("Plan + code extraction failed, retrying...")
-        logger.info("Final plan + code extraction attempt failed, giving up...")
-        return "", completion_text  # type: ignore
-    
+            if len(candidates) >= k:
+                break
+
+        return candidates
+
+
+    def plan_and_code_query(self, prompt,parent_node, retries=3) -> tuple[str, str]:
+        """Generate a natural language plan + code in the same LLM call and split them apart."""
+        completion_text = None
+        if parent_node==None:
+            logger.info("Drafting plan and code...")
+            for _ in range(retries):
+                completion_text = r1_query(
+                    prompt = prompt,
+                    temperature=self.acfg.code.temp,
+                    model=self.acfg.code.model,
+                    cfg=self.cfg
+                )
+
+                code = extract_code(completion_text)
+                nl_text = extract_text_up_to_code(completion_text)
+                if code and nl_text:
+                    # merge all code blocks into a single string
+                    return nl_text, code
+
+                logger.info("Plan + code extraction failed, retrying...")
+            logger.info("Final plan + code extraction attempt failed, giving up...")
+            return "", completion_text  # type: ignore
+        else:
+            candidates = self.generate_candidates(prompt, k=3)
+            if not candidates:
+                return "", completion_text
+            best = self.reward_model_select_hypothesis(parent_node, candidates)
+
+            return best["nl_text"], best["code"]
+
+
+
     def update_data_preview(
         self,
     ):
