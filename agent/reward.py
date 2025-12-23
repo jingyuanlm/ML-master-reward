@@ -4,7 +4,6 @@ import torch
 import torch.nn as nn
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from peft import PeftModel
-from rdagent.app.data_science.conf import DS_RD_SETTING
 
 
 # =====================
