@@ -373,7 +373,7 @@ class MCTSAgent:
             base_model_name=base_model,
             adapter_path=adapter_path,
             reward_head_path=reward_head_path,
-            device="cuda"
+            device="cuda:1"
         )
         model.eval()
         chain = self.get_parent_chain(current_node)
@@ -392,7 +392,8 @@ class MCTSAgent:
         comp_description = comp_dict[exp_id]
         texts_for_reward = [c["hypothesis_chain"] for c in candidates]
         print(texts_for_reward)
-        with torch.autocast("cuda", dtype=torch.float16):
+        
+        with torch.autocast("cuda", dtype=torch.float16, device_index=1):
             rewards = model.compute_reward(
                 texts_for_reward,
                 tokenizer,

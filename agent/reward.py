@@ -13,22 +13,37 @@ class RewardModelInference(nn.Module):
     def __init__(self, base_model_name, adapter_path, reward_head_path, device="cuda"):
         super().__init__()
         self.device = device
-        self.base = AutoModelForCausalLM.from_pretrained(base_model_name)
-        self.base = PeftModel.from_pretrained(self.base, adapter_path)
+
+        self.base = AutoModelForCausalLM.from_pretrained(
+            base_model_name,
+            device_map=None,          # <-- IMPORTANT
+            low_cpu_mem_usage=False,  # <-- prevents meta tensors
+            torch_dtype=torch.float16 # or bfloat16/float32 as you prefer
+        )
+        self.base = PeftModel.from_pretrained(
+            self.base,
+            adapter_path,
+            device_map=None
+        )
+        self.base.to(device)
+
         if hasattr(self.base, "gradient_checkpointing_enable"):
             self.base.gradient_checkpointing_enable()
         if hasattr(self.base.config, "use_cache"):
             self.base.config.use_cache = False
+
         hs = getattr(self.base.config, "hidden_size",
                      getattr(self.base.config, "n_embd",
                      getattr(self.base.config, "d_model", None)))
         if hs is None:
             hs = self.base.get_input_embeddings().embedding_dim
 
-        self.reward_head = nn.Linear(hs, 1, device=device)
-
+        # 6) Init reward head on CPU, load weights, THEN move to device
+        self.reward_head = nn.Linear(hs, 1)
         state = torch.load(reward_head_path, map_location="cpu")
         self.reward_head.load_state_dict(state)
+        self.reward_head = self.reward_head.to(device)
+
 
     @staticmethod
     def pool_last_nonpad(last_hidden: torch.Tensor, attn_mask: torch.Tensor) -> torch.Tensor:
@@ -49,7 +64,8 @@ class RewardModelInference(nn.Module):
         reward = self.reward_head(pooled).squeeze(-1)
         return reward
 
-    def compute_reward(self, texts, tokenizer,comp_description, system_prompt=None, device="cuda"):
+    def compute_reward(self, texts, tokenizer,comp_description, system_prompt=None):
+        device = self.device
         if system_prompt is not None:
             self.system_prompt = system_prompt
         elif not hasattr(self, "system_prompt"):
