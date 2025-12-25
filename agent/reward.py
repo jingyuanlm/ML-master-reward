@@ -25,15 +25,10 @@ class RewardModelInference(nn.Module):
         if hs is None:
             hs = self.base.get_input_embeddings().embedding_dim
 
-        self.reward_head = nn.Linear(hs, 1).to_empty(device="cpu")
+        self.reward_head = nn.Linear(hs, 1, device=device)
+
         state = torch.load(reward_head_path, map_location="cpu")
         self.reward_head.load_state_dict(state)
-        self.reward_head = self.reward_head.to(device)
-
-        # self.reward_head = nn.Linear(hs, 1)
-        # state = torch.load(reward_head_path, map_location="cpu")
-        # self.reward_head.load_state_dict(state)
-        # self.reward_head = self.reward_head.to(device)
 
     @staticmethod
     def pool_last_nonpad(last_hidden: torch.Tensor, attn_mask: torch.Tensor) -> torch.Tensor:

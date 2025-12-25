@@ -18,6 +18,7 @@ from utils.server_utils import call_validate
 from utils.mcts import linear_decay, exponential_decay, piecewise_decay, dynamic_piecewise_decay
 import threading
 import json
+import torch
 logger = logging.getLogger("ml-master")
 
 
@@ -372,9 +373,9 @@ class MCTSAgent:
             base_model_name=base_model,
             adapter_path=adapter_path,
             reward_head_path=reward_head_path,
-        ).to("cuda")
+            device="cuda"
+        )
         model.eval()
-
         chain = self.get_parent_chain(current_node)
 
         for c in candidates:
@@ -391,11 +392,12 @@ class MCTSAgent:
         comp_description = comp_dict[exp_id]
         texts_for_reward = [c["hypothesis_chain"] for c in candidates]
         print(texts_for_reward)
-        rewards = model.compute_reward(
-            texts_for_reward,
-            tokenizer,
-            comp_description
-        )
+        with torch.autocast("cuda", dtype=torch.float16):
+            rewards = model.compute_reward(
+                texts_for_reward,
+                tokenizer,
+                comp_description
+            )
 
         max_idx = rewards.index(max(rewards))
         return  candidates[max_idx]
