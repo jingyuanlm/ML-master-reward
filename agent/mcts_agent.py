@@ -213,8 +213,10 @@ class MCTSAgent:
             user_prompt = f"\n# Task description\n{prompt['Task description']}\n\n# Memory\nThe memory of previous solutions used to solve task is provided below:\n{prompt['Memory']}\n\n{instructions}"
             prompt_complete = f"<｜begin▁of▁sentence｜>\n{introduction}\n<｜User｜>{user_prompt}<｜Assistant｜><think>\nOkay! Now, I will focus my efforts on successfully completing this current task.\nBefore completing this task, first of all, I need to analyze and understand the relevant dataset. The information of the dataset is as follows: \n{self.data_preview}"
         
-        self.virtual_root.add_expected_child_count()
-        plan, code = self.plan_and_code_query(prompt_complete,None)
+        #self.virtual_root.add_expected_child_count()
+        #plan, code = self.plan_and_code_query(prompt_complete,None)
+        plan, code = self.plan_and_code_query(prompt_complete,virtual_root)
+
         new_node = MCTSNode(plan=plan, code=code, parent=self.virtual_root, stage="draft", local_best_node=self.virtual_root)
         logger.info(f"Drafted a new node {new_node.id} successfully!")
         return new_node
@@ -347,11 +349,11 @@ class MCTSAgent:
         """
         Select hypothesis based on reward model scores.
         """
-        from .reward_inference import RewardModelInference
+        from reward import RewardModelInference
         from transformers import AutoTokenizer
         import os
-        reward_model_path = "/data/Blob_EastUS/FinetuneAgenticLLM/reward_ckpt/last_run_5"
-        reward_base_model = "Qwen/Qwen3-0.6B"
+        reward_model_path = "/data/Blob_EastUS/FinetuneAgenticLLM/reward_ckpt/last_run_7"
+        reward_base_model = "Qwen/Qwen3-4B"
         competition_mapping_path = "/data/Blob_EastUS/FinetuneAgenticLLM/reward_ckpt/comp_to_scen.json"
 
         logdir = reward_model_path
