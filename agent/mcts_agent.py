@@ -349,7 +349,7 @@ class MCTSAgent:
         """
         Select hypothesis based on reward model scores.
         """
-        from reward import RewardModelInference
+        from .reward import RewardModelInference
         from transformers import AutoTokenizer
         import os
         reward_model_path = "/data/Blob_EastUS/FinetuneAgenticLLM/reward_ckpt/last_run_7"
