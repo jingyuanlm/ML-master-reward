@@ -215,7 +215,7 @@ class MCTSAgent:
         
         #self.virtual_root.add_expected_child_count()
         #plan, code = self.plan_and_code_query(prompt_complete,None)
-        plan, code = self.plan_and_code_query(prompt_complete,virtual_root)
+        plan, code = self.plan_and_code_query(prompt_complete,self.virtual_root)
 
         new_node = MCTSNode(plan=plan, code=code, parent=self.virtual_root, stage="draft", local_best_node=self.virtual_root)
         logger.info(f"Drafted a new node {new_node.id} successfully!")
