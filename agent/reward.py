@@ -53,16 +53,21 @@ class RewardModelInference(nn.Module):
         return last_hidden.gather(1, idx).squeeze(1)
 
     def forward(self, input_ids, attention_mask):
+        input_ids = input_ids.to(self.device)
+        attention_mask = attention_mask.to(self.device)
+
         out = self.base(
-            input_ids=input_ids.to(self.device),
-            attention_mask=attention_mask.to(self.device),
+            input_ids=input_ids,
+            attention_mask=attention_mask,
             output_hidden_states=True,
-            use_cache=False
+            use_cache=False,
         )
+
         last_hidden = out.hidden_states[-1]
         pooled = self.pool_last_nonpad(last_hidden, attention_mask)
         reward = self.reward_head(pooled).squeeze(-1)
         return reward
+
 
     def compute_reward(self, texts, tokenizer,comp_description, system_prompt=None):
         device = self.device
