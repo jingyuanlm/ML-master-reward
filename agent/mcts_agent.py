@@ -382,7 +382,7 @@ class MCTSAgent:
                 node.plan for node in chain if node.plan is not None
             ]
             plans.append(c["nl_text"])   # or c["plan"]
-            c["hypothesis_chain"] = " -> ".join(plans)
+            c["hypothesis_chain"] = "->".join(plans)
     
         with open(comp_dict_path, "r") as f:
             comp_dict = json.load(f)
@@ -390,6 +390,7 @@ class MCTSAgent:
         exp_id = self.cfg.exp_name.split("_")[0]
         comp_description = comp_dict[exp_id]
         texts_for_reward = [c["hypothesis_chain"] for c in candidates]
+        print(texts_for_reward)
         rewards = model.compute_reward(
             texts_for_reward,
             tokenizer,
