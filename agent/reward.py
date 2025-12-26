@@ -18,7 +18,6 @@ class RewardModelInference(nn.Module):
             base_model_name,
             device_map=None,          # <-- IMPORTANT
             low_cpu_mem_usage=False,  # <-- prevents meta tensors
-            torch_dtype=torch.float16 # or bfloat16/float32 as you prefer
         )
         self.base = PeftModel.from_pretrained(
             self.base,

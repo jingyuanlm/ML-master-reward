@@ -19,6 +19,10 @@ from utils.mcts import linear_decay, exponential_decay, piecewise_decay, dynamic
 import threading
 import json
 import torch
+from .reward import RewardModelInference
+from transformers import AutoTokenizer
+import os
+
 logger = logging.getLogger("ml-master")
 
 
@@ -97,7 +101,26 @@ class MCTSAgent:
         self.journal_lock = threading.Lock()
         self.save_node_lock = threading.Lock()
         self.start_time = time.time()
-        
+
+        reward_model_path = "/data/Blob_EastUS/FinetuneAgenticLLM/reward_ckpt/last_run_7"
+        reward_base_model = "Qwen/Qwen3-4B"
+
+        adapter_path = os.path.join(reward_model_path, "lora_adapter")
+        reward_head_path = os.path.join(reward_model_path, "reward_head.pt")
+
+        self.tokenizer = AutoTokenizer.from_pretrained(reward_base_model)
+        if not getattr(self.tokenizer, "pad_token", None):
+            self.tokenizer.pad_token = self.tokenizer.eos_token
+
+        # 直接在 GPU 初始化，避免 meta tensor
+        self.reward_model = RewardModelInference(
+            base_model_name=reward_base_model,
+            adapter_path=adapter_path,
+            reward_head_path=reward_head_path,
+            device="cuda"
+        )
+        self.reward_model.eval()
+
     @property
     def _prompt_environment(self):
         pkgs = [
@@ -350,32 +373,34 @@ class MCTSAgent:
         """
         Select hypothesis based on reward model scores.
         """
-        from .reward import RewardModelInference
-        from transformers import AutoTokenizer
-        import os
-        reward_model_path = "/data/Blob_EastUS/FinetuneAgenticLLM/reward_ckpt/last_run_7"
-        reward_base_model = "Qwen/Qwen3-4B"
+        # from .reward import RewardModelInference
+        # from transformers import AutoTokenizer
+        # import os
+        # reward_model_path = "/data/Blob_EastUS/FinetuneAgenticLLM/reward_ckpt/last_run_7"
+        # reward_base_model = "Qwen/Qwen3-4B"
+        # competition_mapping_path = "/data/Blob_EastUS/FinetuneAgenticLLM/reward_ckpt/comp_to_scen.json"
+
+        # logdir = reward_model_path
+        # base_model = reward_base_model
+        # comp_dict_path = competition_mapping_path
+
+        # adapter_path = os.path.join(logdir, "lora_adapter")
+        # reward_head_path = os.path.join(logdir, "reward_head.pt")
+        # calib_path = os.path.join(logdir, "calib.json")
+
+        # tokenizer = AutoTokenizer.from_pretrained(base_model)
+        # if not getattr(tokenizer, "pad_token", None):
+        #     tokenizer.pad_token = tokenizer.eos_token
+
+        # model = RewardModelInference(
+        #     base_model_name=base_model,
+        #     adapter_path=adapter_path,
+        #     reward_head_path=reward_head_path,
+        #     device="cuda"
+        # )
+        # model.eval()
         competition_mapping_path = "/data/Blob_EastUS/FinetuneAgenticLLM/reward_ckpt/comp_to_scen.json"
-
-        logdir = reward_model_path
-        base_model = reward_base_model
         comp_dict_path = competition_mapping_path
-
-        adapter_path = os.path.join(logdir, "lora_adapter")
-        reward_head_path = os.path.join(logdir, "reward_head.pt")
-        calib_path = os.path.join(logdir, "calib.json")
-
-        tokenizer = AutoTokenizer.from_pretrained(base_model)
-        if not getattr(tokenizer, "pad_token", None):
-            tokenizer.pad_token = tokenizer.eos_token
-
-        model = RewardModelInference(
-            base_model_name=base_model,
-            adapter_path=adapter_path,
-            reward_head_path=reward_head_path,
-            device="cuda"
-        )
-        model.eval()
         chain = self.get_parent_chain(current_node)
 
         for c in candidates:
@@ -383,6 +408,7 @@ class MCTSAgent:
                 node.plan for node in chain if node.plan is not None
             ]
             plans.append(c["nl_text"])   # or c["plan"]
+            plans = [p[len("virtual plan->"):] if p.startswith("virtual plan->") else p for p in plans]
             c["hypothesis_chain"] = "->".join(plans)
     
         with open(comp_dict_path, "r") as f:
@@ -393,10 +419,9 @@ class MCTSAgent:
         texts_for_reward = [c["hypothesis_chain"] for c in candidates]
         print(texts_for_reward)
 
-        with torch.autocast("cuda", dtype=torch.float16):
-            rewards = model.compute_reward(
+        rewards = self.reward_model.compute_reward(
                 texts_for_reward,
-                tokenizer,
+                self.tokenizer,
                 comp_description
             )
 
