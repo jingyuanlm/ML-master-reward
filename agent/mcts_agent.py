@@ -116,7 +116,7 @@ class MCTSAgent:
             base_model_name=reward_base_model,
             adapter_path=adapter_path,
             reward_head_path=reward_head_path,
-            device="cuda:1"
+            device="cuda"
         )
         self.reward_model.eval()
 
