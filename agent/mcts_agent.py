@@ -363,8 +363,7 @@ class MCTSAgent:
         cur = node if include_self else node.parent
 
         while cur is not None:
-            if cur.plan is not None and not cur.plan.startswith("virtual plan"):
-                chain.append(cur)
+            chain.append(cur)
             cur = cur.parent
 
         return list(reversed(chain))
@@ -402,13 +401,14 @@ class MCTSAgent:
         competition_mapping_path = "/data/Blob_EastUS/FinetuneAgenticLLM/reward_ckpt/comp_to_scen.json"
         comp_dict_path = competition_mapping_path
         chain = self.get_parent_chain(current_node)
-
+        chain = chain[1:]
+        if len(chain) > 5:
+            chain = chain[-5:]
         for c in candidates:
             plans = [
                 node.plan for node in chain if node.plan is not None
             ]
             plans.append(c["nl_text"])   # or c["plan"]
-            #cleaned_plans = [p.replace("virtual plan->", "", 1) for p in plans]
             c["hypothesis_chain"] = "->".join(plans)
     
         with open(comp_dict_path, "r") as f:
