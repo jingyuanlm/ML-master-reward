@@ -112,12 +112,11 @@ class MCTSAgent:
         if not getattr(self.tokenizer, "pad_token", None):
             self.tokenizer.pad_token = self.tokenizer.eos_token
 
-        # 直接在 GPU 初始化，避免 meta tensor
         self.reward_model = RewardModelInference(
             base_model_name=reward_base_model,
             adapter_path=adapter_path,
             reward_head_path=reward_head_path,
-            device="cuda"
+            device="cuda:1"
         )
         self.reward_model.eval()
 
@@ -408,8 +407,8 @@ class MCTSAgent:
                 node.plan for node in chain if node.plan is not None
             ]
             plans.append(c["nl_text"])   # or c["plan"]
-            plans = [p[len("virtual plan->"):] if p.startswith("virtual plan->") else p for p in plans]
-            c["hypothesis_chain"] = "->".join(plans)
+            cleaned_plans = [p.replace("virtual plan->", "", 1) for p in plans]
+            c["hypothesis_chain"] = "->".join(cleaned_plans)
     
         with open(comp_dict_path, "r") as f:
             comp_dict = json.load(f)
