@@ -363,7 +363,8 @@ class MCTSAgent:
         cur = node if include_self else node.parent
 
         while cur is not None:
-            chain.append(cur)
+            if cur.plan is not None and not cur.plan.startswith("virtual plan"):
+                chain.append(cur)
             cur = cur.parent
 
         return list(reversed(chain))
@@ -407,8 +408,8 @@ class MCTSAgent:
                 node.plan for node in chain if node.plan is not None
             ]
             plans.append(c["nl_text"])   # or c["plan"]
-            cleaned_plans = [p.replace("virtual plan->", "", 1) for p in plans]
-            c["hypothesis_chain"] = "->".join(cleaned_plans)
+            #cleaned_plans = [p.replace("virtual plan->", "", 1) for p in plans]
+            c["hypothesis_chain"] = "->".join(plans)
     
         with open(comp_dict_path, "r") as f:
             comp_dict = json.load(f)
