@@ -76,10 +76,14 @@ def journal_to_string_tree(journal: Journal) -> str:
             if node is best_node:
                 markers.append("best")
             marker_str = " & ".join(markers)
-            if marker_str and node.metric.value:
-                s = f"{indent}● {node.metric.value:.3f} ({marker_str}) (ID: {node.id})\n"
+
+            value = node.metric.value
+            value_str = f"{value:.3f}" if isinstance(value, (int, float)) else "N/A"
+            if marker_str:
+                s = f"{indent}● {value_str} ({marker_str}) (ID: {node.id})\n"
             else:
-                s = f"{indent}● {node.metric.value:.3f} (ID: {node.id})\n"
+                s = f"{indent}● {value_str} (ID: {node.id})\n"
+
         tree_str += s
         for child in node.children:
             append_rec(child, level + 1)
