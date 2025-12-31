@@ -417,7 +417,7 @@ class MCTSAgent:
         exp_id = self.cfg.exp_name.split("_")[0]
         comp_description = comp_dict[exp_id]
         texts_for_reward = [c["hypothesis_chain"] for c in candidates]
-        print(texts_for_reward)
+        logger.info(f"texts_for_reward = {texts_for_reward}")
 
         rewards = self.reward_model.compute_reward(
                 texts_for_reward,
@@ -426,6 +426,9 @@ class MCTSAgent:
             )
 
         max_idx = rewards.index(max(rewards))
+        logger.info(f"[Reward Select] max_idx = {max_idx}")
+        logger.info(f"[Reward Select] best_text = {texts_for_reward[max_idx]}")
+        logger.info(f"[Reward Select] best_candidate = {candidates[max_idx]}")
         return  candidates[max_idx]
 
 
@@ -477,7 +480,7 @@ class MCTSAgent:
             logger.info("Final plan + code extraction attempt failed, giving up...")
             return "", completion_text  # type: ignore
         else:
-            candidates = self.generate_candidates(prompt, k=3)
+            candidates = self.generate_candidates(prompt, k=5)
             if not candidates:
                 return "", completion_text
             best = self.reward_model_select_hypothesis(parent_node, candidates)

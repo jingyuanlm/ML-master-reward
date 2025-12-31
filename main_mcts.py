@@ -77,8 +77,13 @@ def journal_to_string_tree(journal: Journal) -> str:
                 markers.append("best")
             marker_str = " & ".join(markers)
 
-            value = node.metric.value
-            value_str = f"{value:.3f}" if isinstance(value, (int, float)) else "N/A"
+            value = getattr(node.metric, "value", None)
+
+            if isinstance(value, (int, float)):
+                value_str = f"{value:.3f}"
+            else:
+                value_str = "N/A"
+
             if marker_str:
                 s = f"{indent}● {value_str} ({marker_str}) (ID: {node.id})\n"
             else:
