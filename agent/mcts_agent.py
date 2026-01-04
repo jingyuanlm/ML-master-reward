@@ -237,8 +237,8 @@ class MCTSAgent:
             prompt_complete = f"<｜begin▁of▁sentence｜>\n{introduction}\n<｜User｜>{user_prompt}<｜Assistant｜><think>\nOkay! Now, I will focus my efforts on successfully completing this current task.\nBefore completing this task, first of all, I need to analyze and understand the relevant dataset. The information of the dataset is as follows: \n{self.data_preview}"
         
         #self.virtual_root.add_expected_child_count()
-        #plan, code = self.plan_and_code_query(prompt_complete,None)
-        plan, code = self.plan_and_code_query(prompt_complete,self.virtual_root)
+        plan, code = self.plan_and_code_query(prompt_complete,None)
+        #plan, code = self.plan_and_code_query(prompt_complete,self.virtual_root)
 
         new_node = MCTSNode(plan=plan, code=code, parent=self.virtual_root, stage="draft", local_best_node=self.virtual_root)
         logger.info(f"Drafted a new node {new_node.id} successfully!")
@@ -296,7 +296,9 @@ class MCTSAgent:
 
         parent_node.add_expected_child_count()
 
-        plan, code = self.plan_and_code_query(prompt_complete,parent_node)
+        #plan, code = self.plan_and_code_query(prompt_complete,parent_node)
+        plan, code = self.plan_and_code_query(prompt_complete,None)
+
         new_node = MCTSNode(plan=plan, code=code, parent=parent_node, stage="improve", local_best_node=parent_node.local_best_node)
         logger.info(f"Improving node {parent_node.id} to create new node {new_node.id}")
         return new_node
