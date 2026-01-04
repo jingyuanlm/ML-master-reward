@@ -457,7 +457,7 @@ class MCTSAgent:
         return candidates
 
 
-    def plan_and_code_query(self, prompt,parent_node, retries=3) -> tuple[str, str]:
+    def plan_and_code_query(self, prompt,parent_node, retries=5) -> tuple[str, str]:
         """Generate a natural language plan + code in the same LLM call and split them apart."""
         completion_text = None
         if parent_node==None:
@@ -480,7 +480,7 @@ class MCTSAgent:
             logger.info("Final plan + code extraction attempt failed, giving up...")
             return "", completion_text  # type: ignore
         else:
-            candidates = self.generate_candidates(prompt, k=5)
+            candidates = self.generate_candidates(prompt, k=3)
             if not candidates:
                 return "", completion_text
             best = self.reward_model_select_hypothesis(parent_node, candidates)
