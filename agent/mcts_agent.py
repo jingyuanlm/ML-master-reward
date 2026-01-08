@@ -102,7 +102,7 @@ class MCTSAgent:
         self.save_node_lock = threading.Lock()
         self.start_time = time.time()
 
-        reward_model_path = "/data/Blob_EastUS/FinetuneAgenticLLM/reward_ckpt/last_run_8"
+        reward_model_path = "/data/Blob_EastUS/FinetuneAgenticLLM/reward_ckpt/last_run_9"
         reward_base_model = "Qwen/Qwen3-4B"
 
         adapter_path = os.path.join(reward_model_path, "lora_adapter")
@@ -237,8 +237,9 @@ class MCTSAgent:
             prompt_complete = f"<｜begin▁of▁sentence｜>\n{introduction}\n<｜User｜>{user_prompt}<｜Assistant｜><think>\nOkay! Now, I will focus my efforts on successfully completing this current task.\nBefore completing this task, first of all, I need to analyze and understand the relevant dataset. The information of the dataset is as follows: \n{self.data_preview}"
         
         #self.virtual_root.add_expected_child_count()
-        plan, code = self.plan_and_code_query(prompt_complete,None)
-        #plan, code = self.plan_and_code_query(prompt_complete,self.virtual_root)
+        
+        #plan, code = self.plan_and_code_query(prompt_complete,None)
+        plan, code = self.plan_and_code_query(prompt_complete,self.virtual_root)
 
         new_node = MCTSNode(plan=plan, code=code, parent=self.virtual_root, stage="draft", local_best_node=self.virtual_root)
         logger.info(f"Drafted a new node {new_node.id} successfully!")
@@ -296,8 +297,8 @@ class MCTSAgent:
 
         parent_node.add_expected_child_count()
 
-        #plan, code = self.plan_and_code_query(prompt_complete,parent_node)
-        plan, code = self.plan_and_code_query(prompt_complete,None)
+        plan, code = self.plan_and_code_query(prompt_complete,parent_node)
+        #plan, code = self.plan_and_code_query(prompt_complete,None)
 
         new_node = MCTSNode(plan=plan, code=code, parent=parent_node, stage="improve", local_best_node=parent_node.local_best_node)
         logger.info(f"Improving node {parent_node.id} to create new node {new_node.id}")
@@ -403,12 +404,12 @@ class MCTSAgent:
         competition_mapping_path = "/data/Blob_EastUS/FinetuneAgenticLLM/reward_ckpt/comp_to_scen.json"
         comp_dict_path = competition_mapping_path
         chain = self.get_parent_chain(current_node)
-        chain = chain[1:]
-        if len(chain) > 5:
-            chain = chain[-5:]
+        #chain = chain[1:]
+        # if len(chain) > 5:
+        #     chain = chain[-5:]
         for c in candidates:
             plans = [
-                node.plan for node in chain if node.plan is not None
+                node.plan for node in chain
             ]
             plans.append(c["nl_text"])   # or c["plan"]
             c["hypothesis_chain"] = "->".join(plans)
@@ -434,7 +435,7 @@ class MCTSAgent:
         return  candidates[max_idx]
 
 
-    def generate_candidates(self, prompt, k=3, retries=10):
+    def generate_candidates(self, prompt, k=5, retries=10):
         candidates = []
 
         for _ in range(retries):
