@@ -101,8 +101,7 @@ class MCTSAgent:
         self.journal_lock = threading.Lock()
         self.save_node_lock = threading.Lock()
         self.start_time = time.time()
-
-        reward_model_path = "/data/Blob_EastUS/FinetuneAgenticLLM/reward_ckpt/last_run_3201"
+        reward_model_path = "/data/Blob_EastUS/FinetuneAgenticLLM/reward_ckpt/last_run_mlmaster_all"
         reward_base_model = "Qwen/Qwen3-4B"
 
         adapter_path = os.path.join(reward_model_path, "lora_adapter")
